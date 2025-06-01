@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Sheet Layout Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #3B82F6; /* blue-500 */
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3); /* blue-500 with opacity */
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #3B82F6; /* blue-500 */
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3); /* blue-500 with opacity */
+        }
+    </style>
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+</head>
+<body class="min-h-screen bg-gray-100 flex flex-col items-center py-10 font-sans">
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">PDF Sheet Layout Tool</h1>
+
+        <div id="pdfLibStatus" class="mb-4 text-center text-blue-600">
+            <svg class="animate-spin inline-block -ml-1 mr-2 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading PDF processing library... (This may take a moment)
+        </div>
+
+        <div class="mb-6">
+            <label for="pdf-upload" class="block text-lg font-medium text-gray-700 mb-2">
+                Upload PDF File
+            </label>
+            <input
+                type="file"
+                id="pdf-upload"
+                accept="application/pdf"
+                class="block w-full text-sm text-gray-500
+                       file:mr-4 file:py-2 file:px-4
+                       file:rounded-full file:border-0
+                       file:text-sm file:font-semibold
+                       file:bg-blue-50 file:text-blue-700
+                       hover:file:bg-blue-100"
+            />
+            <p id="selectedFileName" class="mt-2 text-sm text-gray-600 hidden">Selected: <span class="font-medium"></span></p>
+            <p id="fileError" class="mt-2 text-red-500 text-sm hidden"></p>
+        </div>
+
+        <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="pages-per-sheet" class="block text-lg font-medium text-gray-700 mb-2">
+                    Pages per Sheet
+                </label>
+                <select
+                    id="pages-per-sheet"
+                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md shadow-sm"
+                >
+                    <option value="1">1 page per sheet</option>
+                    <option value="2" selected>2 pages per sheet (1x2)</option>
+                    <option value="4">4 pages per sheet (2x2)</option>
+                    <option value="6">6 pages per sheet (2x3)</option>
+                    <option value="8">8 pages per sheet (2x4)</option>
+                    <option value="9">9 pages per sheet (3x3)</option>
+                    <option value="16">16 pages per sheet (4x4)</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="page-gap" class="block text-lg font-medium text-gray-700 mb-2">
+                    Gap between Pages (points)
+                </label>
+                <input
+                    type="range"
+                    id="page-gap"
+                    min="0"
+                    max="50"
+                    value="10"
+                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+                <span id="pageGapValue" class="text-sm text-gray-600">10 pts</span>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <h2 class="text-lg font-medium text-gray-700 mb-3">Sheet Margins (points)</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="margin-top" class="block text-sm font-medium text-gray-600">Top</label>
+                    <input type="number" id="margin-top" min="0" max="100" value="20" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"/>
+                </div>
+                <div>
+                    <label for="margin-right" class="block text-sm font-medium text-gray-600">Right</label>
+                    <input type="number" id="margin-right" min="0" max="100" value="20" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"/>
+                </div>
+                <div>
+                    <label for="margin-bottom" class="block text-sm font-medium text-gray-600">Bottom</label>
+                    <input type="number" id="margin-bottom" min="0" max="100" value="20" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"/>
+                </div>
+                <div>
+                    <label for="margin-left" class="block text-sm font-medium text-gray-600">Left</label>
+                    <input type="number" id="margin-left" min="0" max="100" value="20" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"/>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-6 flex items-center">
+            <input type="checkbox" id="add-borders" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"/>
+            <label for="add-borders" class="ml-2 block text-base font-medium text-gray-700">
+                Add Borders to Pages
+            </label>
+        </div>
+
+        <button id="generatePdfButton"
+                class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out">
+            Generate PDF
+        </button>
+
+        <div id="downloadLinkContainer" class="mt-8 text-center hidden">
+            <p class="text-lg text-gray-700 mb-4">Your PDF is ready!</p>
+            <a id="downloadPdfLink"
+               class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
+                Download Processed PDF
+                <svg class="ml-3 -mr-1 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </a>
+        </div>
+
+        <div class="mt-10 pt-6 border-t border-gray-200">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">✨ AI-Powered Features ✨</h2>
+
+            <div class="mb-8 p-6 bg-blue-50 rounded-lg shadow-inner">
+                <h3 class="text-xl font-semibold text-blue-800 mb-4">Generate PDF Description</h3>
+                <label for="description-prompt" class="block text-base font-medium text-blue-700 mb-2">
+                    Enter a prompt for the PDF description (e.g., "summary of lecture notes"):
+                </label>
+                <input type="text" id="description-prompt" placeholder="e.g., summary of quantum physics lecture" class="w-full p-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500 mb-3"/>
+                <button id="generateDescriptionButton"
+                        class="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out">
+                    <span id="descriptionSpinner" class="hidden animate-spin h-4 w-4 mr-2 border-b-2 border-white rounded-full"></span>
+                    ✨ Generate Description
+                </button>
+                <label for="generated-description" class="block text-base font-medium text-blue-700 mt-4 mb-2">
+                    Generated Description:
+                </label>
+                <textarea id="generated-description" rows="3" readonly class="w-full p-2 border border-blue-300 rounded-md bg-blue-100 resize-none"></textarea>
+            </div>
+
+            <div class="p-6 bg-green-50 rounded-lg shadow-inner">
+                <h3 class="text-xl font-semibold text-green-800 mb-4">Summarize Input Text</h3>
+                <label for="text-to-summarize" class="block text-base font-medium text-green-700 mb-2">
+                    Paste text to summarize:
+                </label>
+                <textarea id="text-to-summarize" rows="6" placeholder="Paste your text here..." class="w-full p-2 border border-green-300 rounded-md focus:ring-green-500 focus:border-green-500 mb-3 resize-y"></textarea>
+                <button id="summarizeTextButton"
+                        class="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out">
+                    <span id="summarySpinner" class="hidden animate-spin h-4 w-4 mr-2 border-b-2 border-white rounded-full"></span>
+                    ✨ Summarize Text
+                </button>
+                <label for="generated-summary" class="block text-base font-medium text-green-700 mt-4 mb-2">
+                    Generated Summary:
+                </label>
+                <textarea id="generated-summary" rows="4" readonly class="w-full p-2 border border-green-300 rounded-md bg-green-100 resize-none"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for DOM elements and pdf-lib
+        let selectedFile = null;
+        let PDFLib; // Will hold the pdf-lib module (PDFDocument, rgb, StandardFonts)
+        let generatedFileName = 'output.pdf'; // Initialize with a default value
+
+        // DOM Elements - Declared here, assigned in window.onload
+        let pdfLibStatus;
+        let pdfUploadInput;
+        let selectedFileNameDisplay;
+        let fileErrorDisplay;
+        let pagesPerSheetSelect;
+        let pageGapRange;
+        let pageGapValueSpan;
+        let marginTopInput, marginRightInput, marginBottomInput, marginLeftInput;
+        let addBordersCheckbox;
+        let generatePdfButton;
+        let downloadLinkContainer;
+        let downloadPdfLink;
+        let messageBox; // Global message box element (added to HTML)
+
+        let descriptionPromptInput;
+        let generateDescriptionButton;
+        let generatedDescriptionTextarea;
+        let descriptionSpinner;
+
+        let textToSummarizeTextarea;
+        let summarizeTextButton;
+        let generatedSummaryTextarea;
+        let summarySpinner;
+
+        /**
+         * Utility function to show/hide loading spinners.
+         * @param {HTMLElement} spinnerElement - The spinner element.
+         * @param {boolean} show - True to show, false to hide.
+         */
+        function toggleSpinner(spinnerElement, show) {
+            if (spinnerElement) {
+                if (show) {
+                    spinnerElement.classList.remove('hidden');
+                } else {
+                    spinnerElement.classList.add('hidden');
+                }
+            }
+        }
+
+        /**
+         * Displays a message to the user in a styled box.
+         * @param {string} message - The message to display.
+         * @param {string} type - 'success', 'error', or 'info' to determine styling.
+         */
+        function showMessage(message, type = 'info') {
+            // Ensure messageBox is assigned before trying to use it
+            if (messageBox) {
+                messageBox.textContent = message;
+                messageBox.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-blue-100', 'text-blue-800');
+
+                if (type === 'success') {
+                    messageBox.classList.add('bg-green-100', 'text-green-800');
+                } else if (type === 'error') {
+                    messageBox.classList.add('bg-red-100', 'text-red-800');
+                } else { // info
+                    messageBox.classList.add('bg-blue-100', 'text-blue-800');
+                }
+                messageBox.classList.remove('hidden');
+            } else {
+                console.warn('Message box element not found. Message:', message);
+            }
+        }
+
+        // --- Core PDF Processing Logic ---
+        async function processPdf() {
+            if (!selectedFile) {
+                fileErrorDisplay.textContent = 'Please upload a PDF file first.';
+                fileErrorDisplay.classList.remove('hidden');
+                return;
+            }
+
+            // Check if PDFLib is available before proceeding
+            if (typeof window.PDFLib === 'undefined' || typeof window.PDFLib.PDFDocument === 'undefined') {
+                fileErrorDisplay.textContent = 'PDF processing library not fully loaded. Please wait a moment.';
+                fileErrorDisplay.classList.remove('hidden');
+                console.error('PDFLib not ready for processing.');
+                return;
+            }
+
+            generatePdfButton.disabled = true;
+            // Ensure the spinner element exists before trying to query it
+            const pdfButtonSpinner = generatePdfButton.querySelector('svg');
+            if (pdfButtonSpinner) {
+                toggleSpinner(pdfButtonSpinner, true);
+            }
+            fileErrorDisplay.classList.add('hidden');
+            downloadLinkContainer.classList.add('hidden');
+
+            try {
+                const { PDFDocument, rgb } = window.PDFLib; // Access from window.PDFLib
+
+                const arrayBuffer = await selectedFile.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer);
+                const pages = pdfDoc.getPages();
+
+                const newPdfDoc = await PDFDocument.create();
+
+                let numRows, numCols;
+                const pagesPerSheet = parseInt(pagesPerSheetSelect.value);
+                switch (pagesPerSheet) {
+                    case 1: numRows = 1; numCols = 1; break;
+                    case 2: numRows = 1; numCols = 2; break;
+                    case 4: numRows = 2; numCols = 2; break;
+                    case 6: numRows = 2; numCols = 3; break;
+                    case 8: numRows = 2; numCols = 4; break;
+                    case 9: numRows = 3; numCols = 3; break;
+                    case 16: numRows = 4; numCols = 4; break;
+                    default: numRows = 1; numCols = 1; break;
+                }
+
+                const A4_WIDTH = 595.28;
+                const A4_HEIGHT = 841.89;
+
+                const currentMarginTop = parseInt(marginTopInput.value);
+                const currentMarginRight = parseInt(marginRightInput.value);
+                const currentMarginBottom = parseInt(marginBottomInput.value);
+                const currentMarginLeft = parseInt(marginLeftInput.value);
+                const currentPageGap = parseInt(pageGapRange.value);
+                const currentAddBorders = addBordersCheckbox.checked;
+
+                const availableWidth = A4_WIDTH - currentMarginLeft - currentMarginRight;
+                const availableHeight = A4_HEIGHT - currentMarginTop - currentMarginBottom;
+
+                const effectivePageWidth = (availableWidth - (numCols - 1) * currentPageGap) / numCols;
+                const effectivePageHeight = (availableHeight - (numRows - 1) * currentPageGap) / numRows;
+
+                let currentPageIndex = 0;
+
+                while (currentPageIndex < pages.length) {
+                    const newSheet = await newPdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+
+                    for (let row = 0; row < numRows; row++) {
+                        for (let col = 0; col < numCols; col++) {
+                            if (currentPageIndex < pages.length) {
+                                const originalPage = pages[currentPageIndex];
+
+                                // *** FIX: Embed the page before drawing it ***
+                                const embeddedPage = await newPdfDoc.embedPage(originalPage);
+
+                                // Use embeddedPage.width and embeddedPage.height for dimensions
+                                const { width: embeddedWidth, height: embeddedHeight } = embeddedPage.size();
+
+
+                                const scaleX = effectivePageWidth / embeddedWidth;
+                                const scaleY = effectivePageHeight / embeddedHeight;
+                                const scale = Math.min(scaleX, scaleY);
+
+                                const scaledWidth = embeddedWidth * scale;
+                                const scaledHeight = embeddedHeight * scale;
+
+                                const xPos = currentMarginLeft + col * (effectivePageWidth + currentPageGap) + (effectivePageWidth - scaledWidth) / 2;
+                                const yPos = A4_HEIGHT - currentMarginTop - (row + 1) * effectivePageHeight - row * currentPageGap + (effectivePageHeight - scaledHeight) / 2;
+
+                                newSheet.drawPage(embeddedPage, { // Pass the embedded page
+                                    x: xPos,
+                                    y: yPos,
+                                    width: scaledWidth,
+                                    height: scaledHeight,
+                                });
+
+                                if (currentAddBorders) {
+                                    newSheet.drawRectangle({
+                                        x: xPos,
+                                        y: yPos,
+                                        width: scaledWidth,
+                                        height: scaledHeight,
+                                        borderColor: rgb(0, 0, 0),
+                                        borderWidth: 1,
+                                    });
+                                }
+                                currentPageIndex++;
+                            }
+                        }
+                    }
+                }
+
+                const pdfBytes = await newPdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                downloadPdfLink.href = url;
+                downloadPdfLink.download = generatedFileName; // Use the global generatedFileName
+                downloadLinkContainer.classList.remove('hidden');
+                console.log('PDF generated and ready for download.');
+
+            } catch (err) {
+                console.error('Error processing PDF:', err);
+                fileErrorDisplay.textContent = `Failed to process PDF: ${err.message}. Please try again.`;
+                fileErrorDisplay.classList.remove('hidden');
+            } finally {
+                if (pdfButtonSpinner) {
+                    toggleSpinner(pdfButtonSpinner, false);
+                }
+                generatePdfButton.disabled = false;
+            }
+        }
+
+        // --- Gemini API Integration ---
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+        const API_KEY = ""; // Canvas will provide this at runtime
+
+        async function callGeminiAPI(prompt) {
+            try {
+                const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = { contents: chatHistory };
+
+                const response = await fetch(GEMINI_API_URL + API_KEY, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Gemini API Error:', errorData);
+                    throw new Error(`Gemini API error: ${errorData.error.message || response.statusText}`);
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    return result.candidates[0].content.parts[0].text;
+                } else {
+                    console.warn('Gemini API response structure unexpected:', result);
+                    return "No response generated.";
+                }
+            } catch (error) {
+                console.error('Error calling Gemini API:', error);
+                throw error; // Re-throw to be caught by the calling function
+            }
+        }
+
+        async function generatePdfDescription() {
+            const prompt = descriptionPromptInput.value.trim();
+            if (!prompt) {
+                showMessage('Please enter a prompt for the PDF description.', 'error');
+                return;
+            }
+
+            toggleSpinner(descriptionSpinner, true);
+            generateDescriptionButton.disabled = true;
+            generatedDescriptionTextarea.value = ''; // Clear previous output
+            showMessage('Generating description...', 'info');
+
+            try {
+                const llmPrompt = `Generate a concise, descriptive title/summary for a PDF based on this prompt: "${prompt}". Keep it under 100 characters.`;
+                const description = await callGeminiAPI(llmPrompt);
+                generatedDescriptionTextarea.value = description;
+                showMessage('Description generated successfully!', 'success');
+            } catch (error) {
+                showMessage(`Error generating description: ${error.message}`, 'error');
+            } finally {
+                toggleSpinner(descriptionSpinner, false);
+                generateDescriptionButton.disabled = false;
+            }
+        }
+
+        async function summarizeInputText() {
+            const textToSummarize = textToSummarizeTextarea.value.trim();
+            if (!textToSummarize) {
+                showMessage('Please paste some text to summarize.', 'error');
+                return;
+            }
+            if (textToSummarize.length < 50) {
+                showMessage('Please provide more text for a meaningful summary (at least 50 characters).', 'error');
+                return;
+            }
+
+            toggleSpinner(summarySpinner, true);
+            summarizeTextButton.disabled = true;
+            generatedSummaryTextarea.value = ''; // Clear previous output
+            showMessage('Summarizing text...', 'info');
+
+            try {
+                const llmPrompt = `Summarize the following text concisely:\n\n"${textToSummarize}"`;
+                const summary = await callGeminiAPI(llmPrompt);
+                generatedSummaryTextarea.value = summary;
+                showMessage('Text summarized successfully!', 'success');
+            } catch (error) {
+                showMessage(`Error summarizing text: ${error.message}`, 'error');
+            } finally {
+                toggleSpinner(summarySpinner, false);
+                summarizeTextButton.disabled = false;
+            }
+        }
+
+        // --- Event Listeners and Initial Setup ---
+        window.onload = function() {
+            // Assign DOM elements
+            pdfLibStatus = document.getElementById('pdfLibStatus');
+            pdfUploadInput = document.getElementById('pdf-upload');
+            selectedFileNameDisplay = document.getElementById('selectedFileName');
+            fileErrorDisplay = document.getElementById('fileError');
+            pagesPerSheetSelect = document.getElementById('pages-per-sheet');
+            pageGapRange = document.getElementById('page-gap');
+            pageGapValueSpan = document.getElementById('pageGapValue');
+            marginTopInput = document.getElementById('margin-top');
+            marginRightInput = document.getElementById('margin-right');
+            marginBottomInput = document.getElementById('margin-bottom');
+            marginLeftInput = document.getElementById('margin-left');
+            addBordersCheckbox = document.getElementById('add-borders');
+            generatePdfButton = document.getElementById('generatePdfButton');
+            downloadLinkContainer = document.getElementById('downloadLinkContainer');
+            downloadPdfLink = document.getElementById('downloadPdfLink');
+            // Create a messageBox element dynamically if it doesn't exist in HTML
+            messageBox = document.getElementById('messageBox');
+            if (!messageBox) {
+                messageBox = document.createElement('div');
+                messageBox.id = 'messageBox';
+                messageBox.className = 'mt-6 p-3 rounded-lg text-sm hidden';
+                generatePdfButton.parentNode.insertBefore(messageBox, generatePdfButton.nextSibling); // Insert after generate button
+            }
+
+
+            descriptionPromptInput = document.getElementById('description-prompt');
+            generateDescriptionButton = document.getElementById('generateDescriptionButton');
+            generatedDescriptionTextarea = document.getElementById('generated-description');
+            descriptionSpinner = document.getElementById('descriptionSpinner');
+
+            textToSummarizeTextarea = document.getElementById('text-to-summarize');
+            summarizeTextButton = document.getElementById('summarizeTextButton');
+            generatedSummaryTextarea = document.getElementById('generated-summary');
+            summarySpinner = document.getElementById('summarySpinner');
+
+            // Add Event Listeners
+            pdfUploadInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file && file.type === 'application/pdf') {
+                    selectedFile = file;
+                    generatedFileName = `processed_${file.name}`; // Update the global fileName
+                    selectedFileNameDisplay.querySelector('span').textContent = file.name;
+                    selectedFileNameDisplay.classList.remove('hidden');
+                    fileErrorDisplay.classList.add('hidden');
+                    downloadLinkContainer.classList.add('hidden');
+                    // Only enable PDF button if pdf-lib is also loaded
+                    if (typeof window.PDFLib !== 'undefined' && typeof window.PDFLib.PDFDocument !== 'undefined') {
+                        generatePdfButton.disabled = false;
+                    }
+                } else {
+                    selectedFile = null;
+                    generatedFileName = 'output.pdf'; // Reset to default
+                    selectedFileNameDisplay.classList.add('hidden');
+                    fileErrorDisplay.textContent = 'Please select a valid PDF file.';
+                    fileErrorDisplay.classList.remove('hidden');
+                    generatePdfButton.disabled = true; // Disable PDF button if no valid file
+                }
+            });
+
+            pageGapRange.addEventListener('input', (event) => {
+                pageGapValueSpan.textContent = `${event.target.value} pts`;
+            });
+
+            generatePdfButton.addEventListener('click', processPdf);
+            generateDescriptionButton.addEventListener('click', generatePdfDescription);
+            summarizeTextButton.addEventListener('click', summarizeInputText);
+
+            // Initial state for buttons (disabled until pdf-lib is loaded)
+            generatePdfButton.disabled = true; // Disabled by default
+            generateDescriptionButton.disabled = false; // Enable LLM features initially
+            summarizeTextButton.disabled = false;
+
+            // Start checking for pdf-lib readiness after all DOM elements are assigned
+            let checkInterval;
+            let attempts = 0;
+            const maxAttempts = 150; // Max attempts for pdf-lib to load
+            const intervalTime = 500; // Milliseconds between checks
+
+            checkInterval = setInterval(() => {
+                attempts++;
+                if (typeof window.PDFLib !== 'undefined' && typeof window.PDFLib.PDFDocument !== 'undefined') {
+                    pdfLibStatus.textContent = 'PDF processing library loaded successfully!';
+                    pdfLibStatus.classList.remove('text-blue-600');
+                    pdfLibStatus.classList.add('text-green-600');
+                    // Only enable generatePdfButton if a file is already selected
+                    if (selectedFile) {
+                         generatePdfButton.disabled = false;
+                    }
+                    clearInterval(checkInterval); // Stop checking once loaded
+                } else if (attempts >= maxAttempts) {
+                    pdfLibStatus.textContent = 'Error: PDF processing library failed to load. Please check your internet connection.';
+                    pdfLibStatus.classList.remove('text-blue-600');
+                    pdfLibStatus.classList.add('text-red-600');
+                    generatePdfButton.disabled = true; // Keep disabled if load fails
+                    clearInterval(checkInterval); // Stop checking
+                }
+            }, intervalTime);
+        };
+    </script>
+</body>
+</html>
